@@ -101,7 +101,7 @@ bool Eluna::UpdateAI(Creature* me, const uint32 diff)
     return CallAllFunctionsBool(CreatureEventBindings, CreatureUniqueBindings, entry_key, unique_key);
 }
 
-//Called for reaction at enter to combat if not in combat yet (enemy can be NULL)
+//Called for reaction at enter to combat if not in combat yet (enemy can be nullptr)
 //Called at creature aggro either by MoveInLOS or Attack Start
 bool Eluna::EnterCombat(Creature* me, Unit* target)
 {

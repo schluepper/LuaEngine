@@ -70,7 +70,6 @@ namespace Hooks
 {
     enum RegisterTypes
     {
-        REGTYPE_PACKET,
         REGTYPE_SERVER,
         REGTYPE_PLAYER,
         REGTYPE_GUILD,
@@ -89,15 +88,6 @@ namespace Hooks
         REGTYPE_COUNT
     };
 
-    enum PacketEvents
-    {
-        PACKET_EVENT_ON_PACKET_RECEIVE          =     5,       // (event, packet, player) - Player only if accessible. Can return false, newPacket
-        PACKET_EVENT_ON_PACKET_RECEIVE_UNKNOWN  =     6,       // Not Implemented
-        PACKET_EVENT_ON_PACKET_SEND             =     7,       // (event, packet, player) - Player only if accessible. Can return false, newPacket
-
-        PACKET_EVENT_COUNT
-    };
-
     enum ServerEvents
     {
         // Server
@@ -105,14 +95,14 @@ namespace Hooks
         SERVER_EVENT_ON_NETWORK_STOP            =     2,       // Not Implemented
         SERVER_EVENT_ON_SOCKET_OPEN             =     3,       // Not Implemented
         SERVER_EVENT_ON_SOCKET_CLOSE            =     4,       // Not Implemented
-        SERVER_EVENT_ON_PACKET_RECEIVE          =     5,       // (event, packet, player) - Player only if accessible. Can return false, newPacket
-        SERVER_EVENT_ON_PACKET_RECEIVE_UNKNOWN  =     6,       // Not Implemented
-        SERVER_EVENT_ON_PACKET_SEND             =     7,       // (event, packet, player) - Player only if accessible. Can return false, newPacket
+        // UNUSED                               =     5,
+        // UNUSED                               =     6,
+        // UNUSED                               =     7,
 
         // World
         WORLD_EVENT_ON_OPEN_STATE_CHANGE        =     8,        // (event, open) - Needs core support on Mangos
         WORLD_EVENT_ON_CONFIG_LOAD              =     9,        // (event, reload)
-        // UNUSED                               =     10,
+        WORLD_EVENT_ON_CHANNEL_MESSAGE          =     10,       // (event, channel, table)
         WORLD_EVENT_ON_SHUTDOWN_INIT            =     11,       // (event, code, mask)
         WORLD_EVENT_ON_SHUTDOWN_CANCEL          =     12,       // (event)
         WORLD_EVENT_ON_UPDATE                   =     13,       // (event, diff)

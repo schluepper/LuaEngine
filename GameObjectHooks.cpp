@@ -11,6 +11,7 @@
 #include "ElunaIncludes.h"
 #include "ElunaEventMgr.h"
 #include "ElunaTemplate.h"
+#include "TableMgr.h"
 
 using namespace Hooks;
 
@@ -42,8 +43,8 @@ bool Eluna::OnDummyEffect(Unit* pCaster, uint32 spellId, SpellEffIndex effIndex,
 
 void Eluna::UpdateAI(GameObject* pGameObject, uint32 diff)
 {
+    GetEventMgr()->Update(diff, pGameObject);
     START_HOOK(GAMEOBJECT_EVENT_ON_AIUPDATE, pGameObject->GetEntry());
-    pGameObject->elunaEvents->Update(diff);
     Push(pGameObject);
     Push(diff);
     CallAllFunctions(GameObjectEventBindings, key);
@@ -116,6 +117,9 @@ void Eluna::OnGameObjectStateChanged(GameObject* pGameObject, uint32 state)
 void Eluna::OnSpawn(GameObject* pGameObject)
 {
     START_HOOK(GAMEOBJECT_EVENT_ON_SPAWN, pGameObject->GetEntry());
+
+    GetTableMgr()->CreateTable(pGameObject->GetGUID());
+
     Push(pGameObject);
     CallAllFunctions(GameObjectEventBindings, key);
 }

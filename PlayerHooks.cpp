@@ -41,12 +41,12 @@ void Eluna::OnLearnTalents(Player* pPlayer, uint32 talentId, uint32 talentRank, 
 
 bool Eluna::OnCommand(Player* player, const char* text)
 {
-    // If from console, player is NULL
+    // If from console, player is nullptr
     std::string fullcmd(text);
     if (!player || player->GetSession()->GetSecurity() >= SEC_ADMINISTRATOR)
     {
         char* creload = strtok((char*)text, " ");
-        char* celuna = strtok(NULL, "");
+        char* celuna = strtok(nullptr, "");
         if (creload && celuna)
         {
             std::string reload(creload);
@@ -405,7 +405,7 @@ void Eluna::OnMapChanged(Player* player)
 bool Eluna::OnChat(Player* pPlayer, uint32 type, uint32 lang, std::string& msg)
 {
     if (lang == LANG_ADDON)
-        return OnAddonMessage(pPlayer, type, msg, NULL, NULL, NULL, NULL);
+        return OnAddonMessage(pPlayer, type, msg, nullptr, nullptr, nullptr, nullptr);
 
     START_HOOK_WITH_RETVAL(PLAYER_EVENT_ON_CHAT, true);
     bool result = true;
@@ -435,7 +435,7 @@ bool Eluna::OnChat(Player* pPlayer, uint32 type, uint32 lang, std::string& msg)
 bool Eluna::OnChat(Player* pPlayer, uint32 type, uint32 lang, std::string& msg, Group* pGroup)
 {
     if (lang == LANG_ADDON)
-        return OnAddonMessage(pPlayer, type, msg, NULL, NULL, pGroup, NULL);
+        return OnAddonMessage(pPlayer, type, msg, nullptr, nullptr, pGroup, nullptr);
 
     START_HOOK_WITH_RETVAL(PLAYER_EVENT_ON_GROUP_CHAT, true);
     bool result = true;
@@ -466,7 +466,7 @@ bool Eluna::OnChat(Player* pPlayer, uint32 type, uint32 lang, std::string& msg, 
 bool Eluna::OnChat(Player* pPlayer, uint32 type, uint32 lang, std::string& msg, Guild* pGuild)
 {
     if (lang == LANG_ADDON)
-        return OnAddonMessage(pPlayer, type, msg, NULL, pGuild, NULL, NULL);
+        return OnAddonMessage(pPlayer, type, msg, nullptr, pGuild, nullptr, nullptr);
 
     START_HOOK_WITH_RETVAL(PLAYER_EVENT_ON_GUILD_CHAT, true);
     bool result = true;
@@ -497,7 +497,7 @@ bool Eluna::OnChat(Player* pPlayer, uint32 type, uint32 lang, std::string& msg, 
 bool Eluna::OnChat(Player* pPlayer, uint32 type, uint32 lang, std::string& msg, Channel* pChannel)
 {
     if (lang == LANG_ADDON)
-        return OnAddonMessage(pPlayer, type, msg, NULL, NULL, NULL, pChannel);
+        return OnAddonMessage(pPlayer, type, msg, nullptr, nullptr, nullptr, pChannel);
 
     START_HOOK_WITH_RETVAL(PLAYER_EVENT_ON_CHANNEL_CHAT, true);
     bool result = true;
@@ -528,7 +528,7 @@ bool Eluna::OnChat(Player* pPlayer, uint32 type, uint32 lang, std::string& msg, 
 bool Eluna::OnChat(Player* pPlayer, uint32 type, uint32 lang, std::string& msg, Player* pReceiver)
 {
     if (lang == LANG_ADDON)
-        return OnAddonMessage(pPlayer, type, msg, pReceiver, NULL, NULL, NULL);
+        return OnAddonMessage(pPlayer, type, msg, pReceiver, nullptr, nullptr, nullptr);
 
     START_HOOK_WITH_RETVAL(PLAYER_EVENT_ON_WHISPER, true);
     bool result = true;

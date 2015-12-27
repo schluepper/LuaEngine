@@ -17,26 +17,38 @@ extern "C"
 #include "ElunaUtility.h"
 #include "SharedDefines.h"
 
-class ElunaGlobal
+enum ElunaEnvironments
+{
+    ENV_NONE,
+    ENV_MAP,    // For current map only
+    ENV_WORLD,  // For world state only
+    ENV_BOTH,   // For world and map
+    ENV_MAX
+};
+
+class ElunaFunction
 {
 public:
     struct ElunaRegister
     {
+        ElunaEnvironments env;
         const char* name;
-        int(*mfunc)(Eluna*, lua_State*);
+        int(*mfunc)(lua_State*);
     };
 
     static int thunk(lua_State* L)
     {
         ElunaRegister* l = static_cast<ElunaRegister*>(lua_touserdata(L, lua_upvalueindex(1)));
-        Eluna* E = static_cast<Eluna*>(lua_touserdata(L, lua_upvalueindex(2)));
+        if (Eluna::GetEluna(L)->current_thread_id != std::this_thread::get_id())
+        {
+            ELUNA_LOG_ERROR("[Eluna]: Race condition using global function. Report to devs with this message and details about what you were doing - Info: %s", l->name);
+        }
         int args = lua_gettop(L);
-        int expected = l->mfunc(E, L);
+        int expected = l->mfunc(L);
         args = lua_gettop(L) - args;
         if (args < 0 || args > expected)
         {
             ELUNA_LOG_ERROR("[Eluna]: %s returned unexpected amount of arguments %i out of %i. Report to devs", l->name, args, expected);
-            ASSERT(false);
         }
         for (; args < expected; ++args)
             lua_pushnil(L);
@@ -52,14 +64,26 @@ public:
 
         for (; methodTable && methodTable->name && methodTable->mfunc; ++methodTable)
         {
+            if (methodTable->env >= ENV_MAX || methodTable->env < ENV_NONE)
+            {
+                ASSERT(false);
+            }
+            else if (methodTable->env == ENV_NONE)
+                continue;
+            else if (methodTable->env != ENV_BOTH)
+            {
+                if (!E->owner && methodTable->env == ENV_MAP)
+                    continue;
+                else if (E->owner && methodTable->env == ENV_WORLD)
+                    continue;
+            }
             lua_pushstring(E->L, methodTable->name);
             lua_pushlightuserdata(E->L, (void*)methodTable);
-            lua_pushlightuserdata(E->L, (void*)E);
-            lua_pushcclosure(E->L, thunk, 2);
-            lua_settable(E->L, -3);
+            lua_pushcclosure(E->L, thunk, 1);
+            lua_rawset(E->L, -3);
         }
 
-        lua_remove(E->L, -1);
+        lua_pop(E->L, 1);
     }
 };
 
@@ -116,8 +140,9 @@ private:
 template<typename T>
 struct ElunaRegister
 {
+    ElunaEnvironments env;
     const char* name;
-    int(*mfunc)(Eluna*, lua_State*, T*);
+    int(*mfunc)(lua_State*, T*);
 };
 
 template<typename T>
@@ -148,15 +173,19 @@ public:
 
         // create metatable for userdata of this type
         lua_newtable(E->L);
-        int metatable  = lua_gettop(E->L);
+        int metatable = lua_gettop(E->L);
 
-        // push methodtable to stack to be accessed and modified by users
+        // push metatable to stack to be accessed and modified by users
         lua_pushvalue(E->L, metatable);
         lua_setglobal(E->L, tname);
 
         // tostring
         lua_pushcfunction(E->L, ToString);
         lua_setfield(E->L, metatable, "__tostring");
+
+        // concatenation
+        lua_pushcfunction(E->L, Concat);
+        lua_setfield(E->L, metatable, "__concat");
 
         // garbage collecting
         lua_pushcfunction(E->L, CollectGarbage);
@@ -166,57 +195,9 @@ public:
         lua_pushvalue(E->L, metatable);
         lua_setfield(E->L, metatable, "__index");
 
-        // make new indexes saved to methods
-        lua_pushcfunction(E->L, Add);
-        lua_setfield(E->L, metatable, "__add");
-
-        // make new indexes saved to methods
-        lua_pushcfunction(E->L, Substract);
-        lua_setfield(E->L, metatable, "__sub");
-
-        // make new indexes saved to methods
-        lua_pushcfunction(E->L, Multiply);
-        lua_setfield(E->L, metatable, "__mul");
-
-        // make new indexes saved to methods
-        lua_pushcfunction(E->L, Divide);
-        lua_setfield(E->L, metatable, "__div");
-
-        // make new indexes saved to methods
-        lua_pushcfunction(E->L, Mod);
-        lua_setfield(E->L, metatable, "__mod");
-
-        // make new indexes saved to methods
-        lua_pushcfunction(E->L, Pow);
-        lua_setfield(E->L, metatable, "__pow");
-
-        // make new indexes saved to methods
-        lua_pushcfunction(E->L, UnaryMinus);
-        lua_setfield(E->L, metatable, "__unm");
-
-        // make new indexes saved to methods
-        lua_pushcfunction(E->L, Concat);
-        lua_setfield(E->L, metatable, "__concat");
-
-        // make new indexes saved to methods
-        lua_pushcfunction(E->L, Length);
-        lua_setfield(E->L, metatable, "__len");
-
-        // make new indexes saved to methods
+        // enable comparing values
         lua_pushcfunction(E->L, Equal);
         lua_setfield(E->L, metatable, "__eq");
-
-        // make new indexes saved to methods
-        lua_pushcfunction(E->L, Less);
-        lua_setfield(E->L, metatable, "__lt");
-
-        // make new indexes saved to methods
-        lua_pushcfunction(E->L, LessOrEqual);
-        lua_setfield(E->L, metatable, "__le");
-
-        // make new indexes saved to methods
-        lua_pushcfunction(E->L, Call);
-        lua_setfield(E->L, metatable, "__call");
 
         // special method to get the object type
         lua_pushcfunction(E->L, GetType);
@@ -243,11 +224,57 @@ public:
 
         for (; methodTable && methodTable->name && methodTable->mfunc; ++methodTable)
         {
+            if (methodTable->env >= ENV_MAX || methodTable->env < ENV_NONE)
+            {
+                ASSERT(false);
+            }
+            else if (methodTable->env == ENV_NONE)
+                continue;
+            else if (methodTable->env != ENV_BOTH)
+            {
+                if (!E->owner && methodTable->env == ENV_MAP)
+                    continue;
+                else if (E->owner && methodTable->env == ENV_WORLD)
+                    continue;
+            }
             lua_pushstring(E->L, methodTable->name);
             lua_pushlightuserdata(E->L, (void*)methodTable);
-            lua_pushlightuserdata(E->L, (void*)E);
-            lua_pushcclosure(E->L, CallMethod, 2);
-            lua_settable(E->L, -3);
+            lua_pushcclosure(E->L, CallMethod, 1);
+            lua_rawset(E->L, -3);
+        }
+
+        lua_pop(E->L, 1);
+    }
+
+    static void SetMethods(Eluna* E, ElunaFunction::ElunaRegister* methodTable)
+    {
+        ASSERT(E);
+        ASSERT(tname);
+        ASSERT(methodTable);
+
+        // get metatable
+        lua_getglobal(E->L, tname);
+        ASSERT(lua_istable(E->L, -1));
+
+        for (; methodTable && methodTable->name && methodTable->mfunc; ++methodTable)
+        {
+            if (methodTable->env >= ENV_MAX || methodTable->env < ENV_NONE)
+            {
+                ASSERT(false);
+            }
+            else if (methodTable->env == ENV_NONE)
+                continue;
+            else if (methodTable->env != ENV_BOTH)
+            {
+                if (!E->owner && methodTable->env == ENV_MAP)
+                    continue;
+                else if (E->owner && methodTable->env == ENV_WORLD)
+                    continue;
+            }
+            lua_pushstring(E->L, methodTable->name);
+            lua_pushlightuserdata(E->L, (void*)methodTable);
+            lua_pushcclosure(E->L, ElunaFunction::thunk, 1);
+            lua_rawset(E->L, -3);
         }
 
         lua_pop(E->L, 1);
@@ -310,6 +337,8 @@ public:
 
     static T* Check(lua_State* L, int narg, bool error = true)
     {
+        ASSERT(tname);
+
         ElunaObject* elunaObj = Eluna::CHECKTYPE(L, narg, tname, error);
         if (!elunaObj)
             return NULL;
@@ -326,7 +355,7 @@ public:
             {
                 ELUNA_LOG_ERROR("%s", buff);
             }
-            return NULL;
+            return nullptr;
         }
         return static_cast<T*>(elunaObj->GetObj());
     }
@@ -352,14 +381,16 @@ public:
         if (!obj)
             return 0;
         ElunaRegister<T>* l = static_cast<ElunaRegister<T>*>(lua_touserdata(L, lua_upvalueindex(1)));
-        Eluna* E = static_cast<Eluna*>(lua_touserdata(L, lua_upvalueindex(2)));
+        if (Eluna::GetEluna(L)->current_thread_id != std::this_thread::get_id())
+        {
+            ELUNA_LOG_ERROR("[Eluna]: Race condition using member function. Report to devs with this message and details about what you were doing - Info: %s", l->name);
+        }
         int top = lua_gettop(L);
-        int expected = l->mfunc(E, L, obj);
+        int expected = l->mfunc(L, obj);
         int args = lua_gettop(L) - top;
         if (args < 0 || args > expected)
         {
             ELUNA_LOG_ERROR("[Eluna]: %s returned unexpected amount of arguments %i out of %i. Report to devs", l->name, args, expected);
-            ASSERT(false);
         }
         if (args == expected)
             return expected;
@@ -387,21 +418,19 @@ public:
         return 1;
     }
 
-    static int ArithmeticError(lua_State* L) { return luaL_error(L, "attempt to perform arithmetic on a %s value", tname); }
-    static int CompareError(lua_State* L) { return luaL_error(L, "attempt to compare %s", tname); }
-    static int Add(lua_State* L) { return ArithmeticError(L); }
-    static int Substract(lua_State* L) { return ArithmeticError(L); }
-    static int Multiply(lua_State* L) { return ArithmeticError(L); }
-    static int Divide(lua_State* L) { return ArithmeticError(L); }
-    static int Mod(lua_State* L) { return ArithmeticError(L); }
-    static int Pow(lua_State* L) { return ArithmeticError(L); }
-    static int UnaryMinus(lua_State* L) { return ArithmeticError(L); }
-    static int Concat(lua_State* L) { return luaL_error(L, "attempt to concatenate a %s value", tname); }
-    static int Length(lua_State* L) { return luaL_error(L, "attempt to get length of a %s value", tname); }
-    static int Equal(lua_State* L) { Eluna::Push(L, Eluna::CHECKOBJ<T>(L, 1) == Eluna::CHECKOBJ<T>(L, 2)); return 1; }
-    static int Less(lua_State* L) { return CompareError(L); }
-    static int LessOrEqual(lua_State* L) { return CompareError(L); }
-    static int Call(lua_State* L) { return luaL_error(L, "attempt to call a %s value", tname); }
+    static int Concat(lua_State* L)
+    {
+        luaL_tolstring(L, 1, nullptr);
+        luaL_tolstring(L, 2, nullptr);
+        lua_concat(L, 2);
+        return 1;
+    }
+
+    static int Equal(lua_State* L)
+    {
+        Eluna::Push(L, Eluna::CHECKOBJ<T>(L, 1) == Eluna::CHECKOBJ<T>(L, 2));
+        return 1;
+    }
 };
 
 #endif
