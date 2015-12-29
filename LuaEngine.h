@@ -63,9 +63,7 @@ class Corpse;
 class Creature;
 class CreatureAI;
 class GameObject;
-#ifdef TRINITY
 class GameObjectAI;
-#endif
 class Guild;
 class Group;
 #ifdef TRINITY

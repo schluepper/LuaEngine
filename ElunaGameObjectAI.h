@@ -7,10 +7,17 @@
 #ifndef _ELUNA_GAME_OBJECT_AI_H
 #define _ELUNA_GAME_OBJECT_AI_H
 
-#include "GameObjectAI.h"
 #include "GameObject.h"
 #include "LuaEngine.h"
 #include "TableMgr.h"
+
+#ifdef TRINITY
+    #include "GameObjectAI.h"
+#else
+    // Temp workaround for MaNGOS - not supporting GameObjectAI yet
+    class GameObjectAI { public: GameObjectAI(GameObject* g) : go(g) {}
+    protected: GameObject* go;};
+#endif
 
 struct ElunaGameObjectAI : GameObjectAI
 {
