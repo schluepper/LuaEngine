@@ -1883,7 +1883,12 @@ namespace LuaUnit
     int SetWalk(lua_State* L, Unit* unit)
     {
         bool enable = Eluna::CHECKVAL<bool>(L, 2, true);
+#ifdef TRINITY
         unit->SetWalk(enable);
+#else
+        if (unit->ToCreature())
+            unit->ToCreature()->SetWalk(enable);
+#endif
         return 0;
     }
 
@@ -2284,7 +2289,7 @@ namespace LuaUnit
      */
     int CastSpell(lua_State* L, Unit* unit)
     {
-        Unit* target = Eluna::CHECKOBJ<Unit>(L, 2, NULL);
+        Unit* target = Eluna::CHECKOBJ<Unit>(L, 2, false);
         uint32 spell = Eluna::CHECKVAL<uint32>(L, 3);
         bool triggered = Eluna::CHECKVAL<bool>(L, 4, false);
         SpellEntry const* spellEntry = sSpellStore.LookupEntry(spell);
@@ -2310,7 +2315,7 @@ namespace LuaUnit
      */
     int CastCustomSpell(lua_State* L, Unit* unit)
     {
-        Unit* target = Eluna::CHECKOBJ<Unit>(L, 2, NULL);
+        Unit* target = Eluna::CHECKOBJ<Unit>(L, 2, false);
         uint32 spell = Eluna::CHECKVAL<uint32>(L, 3);
         bool triggered = Eluna::CHECKVAL<bool>(L, 4, false);
         bool has_bp0 = !lua_isnoneornil(L, 5);

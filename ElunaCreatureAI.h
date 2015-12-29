@@ -28,11 +28,11 @@ struct ElunaCreatureAI : ScriptedAI
 
     ElunaCreatureAI(Creature* creature) : ScriptedAI(creature), justSpawned(true)
     {
-        me->GetMap()->GetEluna()->GetTableMgr()->CreateTable(me->GetGUID());
+        me->GetMap()->GetEluna()->GetTableMgr()->CreateTable(me->GET_GUID());
     }
     ~ElunaCreatureAI()
     {
-        me->GetMap()->GetEluna()->GetTableMgr()->DeleteTableRef(me->GetGUID());
+        me->GetMap()->GetEluna()->GetTableMgr()->DeleteTableRef(me->GET_GUID());
     }
 
     //Called at World update tick

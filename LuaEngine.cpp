@@ -41,7 +41,7 @@ std::string Eluna::lua_requirepath;
 Eluna::InstanceHolder Eluna::instances;
 Eluna* Eluna::GEluna(nullptr);
 MsgQueue Eluna::msgque;
-std::thread::id const Eluna::main_thread_id(std::this_thread::get_id());
+std::thread::id Eluna::main_thread_id(std::this_thread::get_id());
 std::atomic<bool> Eluna::reload(false);
 std::atomic<bool> Eluna::initialized(false);
 Eluna::LockType Eluna::lock;

@@ -257,13 +257,15 @@ private:
     {
         return CallAllFunctionsBool<K, K>(bindings, nullptr, key, key, default_value);
     }
+    static std::thread::id main_thread_id;
 
 public:
     static void ASSERT_MAIN_THREAD() { ASSERT(main_thread_id == std::this_thread::get_id()); }
+    static void ResetMainThreadId() { main_thread_id = std::this_thread::get_id(); }
+    static std::thread::id GetMainThreadId() { return main_thread_id; }
 
     static Eluna* GEluna;
     static MsgQueue msgque;
-    static std::thread::id const main_thread_id;
     std::thread::id current_thread_id;
     EventMgr* eventMgr;
     TableMgr* tableMgr;
@@ -617,5 +619,7 @@ template<> WorldObject* Eluna::CHECKOBJ<WorldObject>(lua_State* L, int narg, boo
 template<> ElunaObject* Eluna::CHECKOBJ<ElunaObject>(lua_State* L, int narg, bool error);
 
 #define sEluna(info) Eluna::GetGEluna(info)
+#define GlobalEluna(call) sEluna(#call)->call
 #define ElunaDo(_obj_) if (_obj_ && _obj_->FindMap()) _obj_->FindMap()->GetEluna()
+#define ElunaIf(_obj_, call) (_obj_ && _obj_->FindMap() && _obj_->FindMap()->GetEluna()->call)
 #endif

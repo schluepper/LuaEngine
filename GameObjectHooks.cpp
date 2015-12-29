@@ -118,7 +118,7 @@ void Eluna::OnSpawn(GameObject* pGameObject)
 {
     START_HOOK(GAMEOBJECT_EVENT_ON_SPAWN, pGameObject->GetEntry());
 
-    GetTableMgr()->CreateTable(pGameObject->GetGUID());
+    GetTableMgr()->CreateTable(pGameObject->GET_GUID());
 
     Push(pGameObject);
     CallAllFunctions(GameObjectEventBindings, key);

@@ -100,7 +100,7 @@ void EventMgr::DeleteGlobal()
 
 void EventMgr::Update(uint32 diff, WorldObject* obj)
 {
-    auto it = processorMap.find(obj->GetGUID());
+    auto it = processorMap.find(obj->GET_GUID());
     if (it == processorMap.end())
         return;
     it->second.Update(diff, owner, obj);

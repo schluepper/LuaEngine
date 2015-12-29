@@ -16,11 +16,11 @@ struct ElunaGameObjectAI : GameObjectAI
 {
     ElunaGameObjectAI(GameObject* gameobject) : GameObjectAI(gameobject)
     {
-        go->GetMap()->GetEluna()->GetTableMgr()->CreateTable(go->GetGUID());
+        go->GetMap()->GetEluna()->GetTableMgr()->CreateTable(go->GET_GUID());
     }
     ~ElunaGameObjectAI()
     {
-        go->GetMap()->GetEluna()->GetTableMgr()->DeleteTableRef(go->GetGUID());
+        go->GetMap()->GetEluna()->GetTableMgr()->DeleteTableRef(go->GET_GUID());
     }
 };
 
