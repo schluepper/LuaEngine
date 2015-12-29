@@ -124,6 +124,7 @@ struct LuaScript
 // defines for global variables used internally - do not edit these in the lua state!
 #define ELUNA_OBJECT_STORE  "_Eluna Object Store"
 #define ELUNA_STATE_PTR     "_Eluna State Ptr"
+#define ELUNA_SAFE_MODE_ENV "_Eluna Safe Mode Env"
 #define LOCK_ELUNA /*Eluna::Guard __guard(Eluna::GetLock())*/
 
 class MsgQueue
@@ -141,6 +142,36 @@ public:
 
     Queue que;
     LockType _msglock;
+};
+
+class LuaScriptLoader
+{
+public:
+    LuaScriptLoader(const char* name): _name(name) {}
+    virtual const char* Read(size_t& size) = 0;
+    const char* GetScriptName() { return _name; }
+protected:
+    const char* _name;
+};
+
+class LuaFileScriptLoader: public LuaScriptLoader
+{
+public:
+    LuaFileScriptLoader(const char* scriptname, const char* filename);
+    virtual const char* Read(size_t& size);
+protected:
+    FILE*   _file;
+    char    _rbuf[1024];
+};
+
+class LuaStringScriptLoader: public LuaScriptLoader
+{
+public:
+    LuaStringScriptLoader(const char* scriptname, std::string const& content);
+    virtual const char* Read(size_t& size);
+protected:
+    bool                _read;
+    std::string const&  _content;
 };
 
 class Eluna
@@ -203,6 +234,7 @@ private:
     //  this is used to keep track of how many arguments were pushed.
     uint8 push_counter;
     bool enabled;
+    bool safe_mode;
 
     // Map from instance ID -> Lua table ref
     std::unordered_map<uint32, int> instanceDataRefs;
@@ -376,6 +408,8 @@ public:
     void PushInstanceData(lua_State* L, ElunaInstanceAI* ai, bool incrementCounter = true);
 
     void RunScripts();
+    uint32 RunScripts(ScriptList const& scripts, std::unordered_map<std::string, std::string>& loaded);
+    bool RunScript(LuaScriptLoader& loader);
     bool IsEnabled() const { return enabled; }
     int Register(lua_State* L, uint8 reg, uint32 entry, uint64 guid, uint32 instanceId, uint32 event_id, int functionRef, uint32 shots);
 

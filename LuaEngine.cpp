@@ -196,6 +196,7 @@ Eluna::Eluna(Map* map) :
 event_level(0),
 push_counter(0),
 enabled(false),
+safe_mode(false),
 
 current_thread_id(std::this_thread::get_id()),
 eventMgr(nullptr),
@@ -516,7 +517,34 @@ void Eluna::RunScripts()
     scripts.insert(scripts.end(), lua_scripts.begin(), lua_scripts.end());
 
     std::unordered_map<std::string, std::string> loaded; // filename, path
+    count += RunScripts(lua_extensions, loaded);
 
+    // Setup safe_mode here
+    safe_mode = eConfig->GetBoolValue("Eluna.SafeMode", true);
+    lua_getglobal(L, "sandbox_env");
+    if (lua_istable(L, -1))
+        lua_setglobal(L, ELUNA_SAFE_MODE_ENV);
+    else
+    {
+        if (safe_mode)
+            sLog.outError("LUA variable sandbox_env not found ! LUA scripts won't load.");
+        lua_newtable(L);
+        lua_setglobal(L, ELUNA_SAFE_MODE_ENV);
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+
+
+    count += RunScripts(lua_scripts, loaded);
+
+    ELUNA_LOG_DEBUG("[Eluna]: Executed %u Lua scripts (including %u extensions) in %u ms", count, lua_extensions.size(), ElunaUtil::GetTimeDiff(oldMSTime));
+
+    OnLuaStateOpen();
+}
+
+uint32 Eluna::RunScripts(ScriptList const& scripts, std::unordered_map<std::string, std::string>& loaded)
+{
+    uint32 count = 0;
     lua_getglobal(L, "package");
     // Stack: package
     luaL_getsubtable(L, -1, "loaded");
@@ -541,31 +569,11 @@ void Eluna::RunScripts()
             continue;
         }
         lua_pop(L, 1);
-        // Stack: package, modules
-
-        if (luaL_loadfile(L, it->filepath.c_str()))
+        LuaFileScriptLoader loader(it->filename.c_str(), it->filepath.c_str());
+        if (RunScript(loader))
         {
-            // Stack: package, modules, errmsg
-            ELUNA_LOG_ERROR("[Eluna]: Error loading `%s`", it->filepath.c_str());
-            Report(L);
-            // Stack: package, modules
-            continue;
-        }
-        // Stack: package, modules, filefunc
-
-        if (ExecuteCall(0, 1))
-        {
-            // Stack: package, modules, result
-            if (lua_isnoneornil(L, -1) || (lua_isboolean(L, -1) && !lua_toboolean(L, -1)))
-            {
-                // if result evaluates to false, change it to true
-                lua_pop(L, 1);
-                Push(L, true);
-            }
-            lua_setfield(L, modules, it->filename.c_str());
-            // Stack: package, modules
-
             // successfully loaded and ran file
+            lua_setfield(L, modules, it->filename.c_str());
             ELUNA_LOG_DEBUG("[Eluna]: Successfully loaded `%s`", it->filepath.c_str());
             ++count;
             continue;
@@ -573,9 +581,53 @@ void Eluna::RunScripts()
     }
     // Stack: package, modules
     lua_pop(L, 2);
-    ELUNA_LOG_DEBUG("[Eluna]: Executed %u Lua scripts in %u ms", count, ElunaUtil::GetTimeDiff(oldMSTime));
+    return count;
+}
 
-    OnLuaStateOpen();
+const char *Eluna_RunScript_Reader(lua_State *,
+                                    void *data,
+                                    size_t *size)
+{
+    LuaScriptLoader* script = (LuaScriptLoader*)data;
+    return script->Read(*size);
+}
+
+bool Eluna::RunScript(LuaScriptLoader& loader)
+{
+    // Allow binary and text modes ?
+    const char* mode = safe_mode ? "t" : "bt"; // Possible flaws with binary code
+    int loadResult = lua_load(L, Eluna_RunScript_Reader, (&loader), loader.GetScriptName(), "bt");
+    if (loadResult)
+    {
+        // Stack: errmsg
+        ELUNA_LOG_ERROR("[Eluna]: Error %i loading `%s`", loadResult, loader.GetScriptName());
+        Report(L);
+        return false;
+    }
+    // Stack: filefunc
+
+    // Sandbox protection - before script execution
+    if (safe_mode)
+    {
+        lua_getglobal(L, ELUNA_SAFE_MODE_ENV);
+        lua_setupvalue(L, -2, 1);
+    }
+
+    if (ExecuteCall(0, 1))
+    {
+        // Stack: result
+        if (lua_isnoneornil(L, -1) || (lua_isboolean(L, -1) && !lua_toboolean(L, -1)))
+        {
+            // if result evaluates to false, change it to true
+            lua_pop(L, 1);
+            Push(L, true);
+        }
+        // Stack: (empty)
+
+        // successfully loaded and ran file
+        return true;
+    }
+    return false;
 }
 
 void Eluna::InvalidateObjects()
@@ -1392,4 +1444,34 @@ void Eluna::PushInstanceData(lua_State* L, ElunaInstanceAI* ai, bool incrementCo
 
     if (incrementCounter)
         ++push_counter;
+}
+
+LuaFileScriptLoader::LuaFileScriptLoader(const char* scriptname, const char* filename):
+    LuaScriptLoader(scriptname)
+{
+    _file = fopen(filename, "r");
+}
+
+const char* LuaFileScriptLoader::Read(size_t& size)
+{
+    if (!_file)
+        return nullptr;
+    if (feof(_file))
+        return nullptr;
+    size = fread(_rbuf, 1, sizeof(_rbuf), _file);  /* read block */
+    return _rbuf;
+}
+
+LuaStringScriptLoader::LuaStringScriptLoader(const char* scriptname, std::string const& content):
+    LuaScriptLoader(scriptname), _read(false), _content(content)
+{
+}
+
+const char* LuaStringScriptLoader::Read(size_t& size)
+{
+    if (_read)
+        return nullptr;
+    _read = true;
+    size = _content.size();
+    return _content.c_str();
 }
