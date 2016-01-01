@@ -22,17 +22,21 @@ struct ElunaCreatureAI : ScriptedAI
     bool justSpawned;
     // used to delay movementinform hook (WP hook)
     std::vector< std::pair<uint32, uint32> > movepoints;
+    Eluna* scriptEngine;
 #ifndef TRINITY
 #define me  m_creature
 #endif
 
-    ElunaCreatureAI(Creature* creature) : ScriptedAI(creature), justSpawned(true)
+    ElunaCreatureAI(Creature* creature) :
+        ScriptedAI(creature),
+        justSpawned(true),
+        scriptEngine(me->GetMap()->GetEluna())
     {
-        me->GetMap()->GetEluna()->GetTableMgr()->CreateTable(me->GET_GUID());
+        scriptEngine->GetTableMgr()->CreateTable(me->GET_GUID());
     }
     ~ElunaCreatureAI()
     {
-        me->GetMap()->GetEluna()->GetTableMgr()->DeleteTableRef(me->GET_GUID());
+        scriptEngine->GetTableMgr()->DeleteTableRef(me->GET_GUID());
     }
 
     //Called at World update tick
