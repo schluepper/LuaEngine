@@ -228,9 +228,9 @@ CreatureUniqueBindings(nullptr)
 
     // Replace this with map insert if making multithread version
 
-    // Set event manager. Must be after setting sEluna
-    // on multithread have a map of state pointers and here insert this pointer to the map and then save a pointer of that pointer to the EventMgr
+    // Set event manager
     eventMgr = new EventMgr(this);
+    tableMgr = new TableMgr(this);
 
     instances.Add(this);
 }
@@ -245,6 +245,9 @@ Eluna::~Eluna()
 
     delete eventMgr;
     eventMgr = nullptr;
+
+    delete tableMgr;
+    tableMgr = nullptr;
 }
 
 void Eluna::CloseLua()
