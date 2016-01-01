@@ -282,6 +282,7 @@ public:
 
     static int Push(lua_State* L, T const* obj)
     {
+        int baseStack = lua_gettop(L);
         if (!obj)
         {
             lua_pushnil(L);
@@ -293,21 +294,23 @@ public:
         lua_getglobal(L, ELUNA_OBJECT_STORE);
         ASSERT(lua_istable(L, -1));
         lua_pushlightuserdata(L, obj_voidptr);
+        // Stack: objStore, obj_voidptr
         lua_rawget(L, -2);
+        // Stack: objStore, objStore[obj_voidptr]
+
         if (ElunaObject* elunaObj = Eluna::CHECKTYPE(L, -1, tname, false))
         {
             // set userdata valid
             elunaObj->SetValid(true);
-
-            // remove userdata_table, leave userdata
             lua_remove(L, -2);
             return 1;
         }
-        lua_pop(L, 1);
-        // left userdata_table in stack
+        lua_pop(L, 2);
+        lua_getglobal(L, ELUNA_OBJECT_STORE);
 
         // Create new userdata
         ElunaObject** ptrHold = static_cast<ElunaObject**>(lua_newuserdata(L, sizeof(ElunaObject*)));
+        // Stack: objStore, ptrHold
         if (!ptrHold)
         {
             ELUNA_LOG_ERROR("%s could not create new userdata", tname);
@@ -319,6 +322,7 @@ public:
 
         // Set metatable for it
         lua_getglobal(L, tname);
+        // Stack: objStore, ptrHold, metatable
         if (!lua_istable(L, -1))
         {
             ELUNA_LOG_ERROR("%s missing metatable", tname);
@@ -327,10 +331,14 @@ public:
             return 1;
         }
         lua_setmetatable(L, -2);
+        // Stack: objStore, ptrHold (with metatable)
 
         lua_pushlightuserdata(L, obj_voidptr);
+        // Stack: objStore, ptrHold, obj_voidptr
         lua_pushvalue(L, -2);
-        lua_rawset(L, -4);
+        // Stack: objStore, ptrHold, obj_voidptr, ptrHold
+        lua_rawset(L, -4); // Sets: objStore[obj_voidptr] = ptrHold
+        // Stack: objStore, ptrHold
         lua_remove(L, -2);
         return 1;
     }
