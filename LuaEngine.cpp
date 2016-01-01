@@ -531,6 +531,7 @@ void Eluna::RunScripts()
         lua_setglobal(L, ELUNA_SAFE_MODE_ENV);
     else
     {
+        lua_pop(L, 1);
         if (safe_mode)
             ELUNA_LOG_ERROR("LUA variable sandbox_env not found ! LUA scripts won't load.");
         lua_newtable(L);
