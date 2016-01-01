@@ -300,6 +300,11 @@ public:
     static void ASSERT_MAIN_THREAD() { ASSERT(main_thread_id == std::this_thread::get_id()); }
     static void ResetMainThreadId() { main_thread_id = std::this_thread::get_id(); }
     static std::thread::id GetMainThreadId() { return main_thread_id; }
+    bool IsSafeMode() const { return safe_mode; }
+    /*
+     * Returns true iif the function at $funcindex is sandboxed
+     */
+    bool IsSandboxed() const;
 
     static Eluna* GEluna;
     static MsgQueue msgque;

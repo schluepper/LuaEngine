@@ -17,13 +17,11 @@ extern "C"
 #include "ElunaUtility.h"
 #include "SharedDefines.h"
 
-enum ElunaEnvironments
+enum ElunaFunctionFlags
 {
-    ENV_NONE,
-    ENV_MAP,    // For current map only
-    ENV_WORLD,  // For world state only
-    ENV_BOTH,   // For world and map
-    ENV_MAX
+    FLAGS_NONE,
+    MTMAP_SAFE                 = 0x01,    // Safe to call it during local map update - if called for Objects related to this Map
+    NOT_IN_SAFEMODE            = 0x02,    // Enabled in Eluna SafeMode
 };
 
 class ElunaFunction
@@ -31,7 +29,7 @@ class ElunaFunction
 public:
     struct ElunaRegister
     {
-        ElunaEnvironments env;
+        int flags;
         const char* name;
         int(*mfunc)(lua_State*);
     };
@@ -39,7 +37,18 @@ public:
     static int thunk(lua_State* L)
     {
         ElunaRegister* l = static_cast<ElunaRegister*>(lua_touserdata(L, lua_upvalueindex(1)));
-        if (Eluna::GetEluna(L)->current_thread_id != std::this_thread::get_id())
+        Eluna* E = Eluna::GetEluna(L);
+        if (E->owner && !(l->flags & MTMAP_SAFE))
+        {
+            ELUNA_LOG_ERROR("[Eluna]: Function %s is not multithread safe and can't be used in this context.", l->name);
+            return 0;
+        }
+        if (E->IsSafeMode() && l->flags & NOT_IN_SAFEMODE && E->IsSandboxed())
+        {
+            ELUNA_LOG_ERROR("[Eluna]: Function %s not allowed in LUA SafeMode.", l->name);
+            return 0;
+        }
+        if (E->current_thread_id != std::this_thread::get_id())
         {
             ELUNA_LOG_ERROR("[Eluna]: Race condition using global function. Report to devs with this message and details about what you were doing - Info: %s", l->name);
         }
@@ -64,19 +73,6 @@ public:
 
         for (; methodTable && methodTable->name && methodTable->mfunc; ++methodTable)
         {
-            if (methodTable->env >= ENV_MAX || methodTable->env < ENV_NONE)
-            {
-                ASSERT(false);
-            }
-            else if (methodTable->env == ENV_NONE)
-                continue;
-            else if (methodTable->env != ENV_BOTH)
-            {
-                if (!E->owner && methodTable->env == ENV_MAP)
-                    continue;
-                else if (E->owner && methodTable->env == ENV_WORLD)
-                    continue;
-            }
             lua_pushstring(E->L, methodTable->name);
             lua_pushlightuserdata(E->L, (void*)methodTable);
             lua_pushcclosure(E->L, thunk, 1);
@@ -140,7 +136,7 @@ private:
 template<typename T>
 struct ElunaRegister
 {
-    ElunaEnvironments env;
+    int flags;
     const char* name;
     int(*mfunc)(lua_State*, T*);
 };
@@ -221,63 +217,20 @@ public:
         // get metatable
         lua_getglobal(E->L, tname);
         ASSERT(lua_istable(E->L, -1));
+        // Stack: C metatable
 
         for (; methodTable && methodTable->name && methodTable->mfunc; ++methodTable)
         {
-            if (methodTable->env >= ENV_MAX || methodTable->env < ENV_NONE)
-            {
-                ASSERT(false);
-            }
-            else if (methodTable->env == ENV_NONE)
-                continue;
-            else if (methodTable->env != ENV_BOTH)
-            {
-                if (!E->owner && methodTable->env == ENV_MAP)
-                    continue;
-                else if (E->owner && methodTable->env == ENV_WORLD)
-                    continue;
-            }
             lua_pushstring(E->L, methodTable->name);
             lua_pushlightuserdata(E->L, (void*)methodTable);
             lua_pushcclosure(E->L, CallMethod, 1);
+            // Stack: C metatable, methodName, CallMethod with methodTable
             lua_rawset(E->L, -3);
+            // Stack: C metatable
         }
 
         lua_pop(E->L, 1);
-    }
-
-    static void SetMethods(Eluna* E, ElunaFunction::ElunaRegister* methodTable)
-    {
-        ASSERT(E);
-        ASSERT(tname);
-        ASSERT(methodTable);
-
-        // get metatable
-        lua_getglobal(E->L, tname);
-        ASSERT(lua_istable(E->L, -1));
-
-        for (; methodTable && methodTable->name && methodTable->mfunc; ++methodTable)
-        {
-            if (methodTable->env >= ENV_MAX || methodTable->env < ENV_NONE)
-            {
-                ASSERT(false);
-            }
-            else if (methodTable->env == ENV_NONE)
-                continue;
-            else if (methodTable->env != ENV_BOTH)
-            {
-                if (!E->owner && methodTable->env == ENV_MAP)
-                    continue;
-                else if (E->owner && methodTable->env == ENV_WORLD)
-                    continue;
-            }
-            lua_pushstring(E->L, methodTable->name);
-            lua_pushlightuserdata(E->L, (void*)methodTable);
-            lua_pushcclosure(E->L, ElunaFunction::thunk, 1);
-            lua_rawset(E->L, -3);
-        }
-
-        lua_pop(E->L, 1);
+        // Stack: empty
     }
 
     static int Push(lua_State* L, T const* obj)
@@ -388,17 +341,28 @@ public:
         T* obj = Eluna::CHECKOBJ<T>(L, 1); // get self
         if (!obj)
             return 0;
+        Eluna* E = Eluna::GetEluna(L);
         ElunaRegister<T>* l = static_cast<ElunaRegister<T>*>(lua_touserdata(L, lua_upvalueindex(1)));
-        if (Eluna::GetEluna(L)->current_thread_id != std::this_thread::get_id())
+        if (E->owner && !(l->flags & MTMAP_SAFE))
         {
-            ELUNA_LOG_ERROR("[Eluna]: Race condition using member function. Report to devs with this message and details about what you were doing - Info: %s", l->name);
+            ELUNA_LOG_ERROR("[Eluna]: Function %s:%s is not multithread safe and can't be used in this context.", tname, l->name);
+            return 0;
+        }
+        if (E->IsSafeMode() && l->flags & NOT_IN_SAFEMODE && E->IsSandboxed())
+        {
+            ELUNA_LOG_ERROR("[Eluna]: Function %s:%s not allowed in LUA SafeMode.", tname, l->name);
+            return 0;
+        }
+        if (E->current_thread_id != std::this_thread::get_id())
+        {
+            ELUNA_LOG_ERROR("[Eluna]: Race condition using global function. Report to devs with this message and details about what you were doing - Info: %s:%s", tname, l->name);
         }
         int top = lua_gettop(L);
         int expected = l->mfunc(L, obj);
         int args = lua_gettop(L) - top;
         if (args < 0 || args > expected)
         {
-            ELUNA_LOG_ERROR("[Eluna]: %s returned unexpected amount of arguments %i out of %i. Report to devs", l->name, args, expected);
+            ELUNA_LOG_ERROR("[Eluna]: %s:%s returned unexpected amount of arguments %i out of %i. Report to devs", tname, l->name, args, expected);
         }
         if (args == expected)
             return expected;

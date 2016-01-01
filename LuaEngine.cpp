@@ -30,6 +30,7 @@ extern "C"
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
+#include "lstate.h"
 
 // Additional lua libraries
 };
@@ -620,7 +621,7 @@ bool Eluna::RunScript(LuaScriptLoader& loader)
     if (safe_mode)
     {
         lua_getglobal(L, ELUNA_SAFE_MODE_ENV);
-        lua_setupvalue(L, -2, 1);
+        lua_setupvalue(L, -2, 1); // First upvalue of file main chunk is environment
     }
 
     if (ExecuteCall(0, 1))
@@ -1454,6 +1455,58 @@ void Eluna::PushInstanceData(lua_State* L, ElunaInstanceAI* ai, bool incrementCo
 
     if (incrementCounter)
         ++push_counter;
+}
+
+bool Eluna::IsSandboxed() const
+{
+    if (!L->ci->previous) // No caller / Full stack empty
+        return true;
+    // HACK to access LUA caller function environment
+    // index2addr is working this way:
+    //      L->ci->func + idx;
+    // So let's trick LUA into thinking we are the previous function ... hum hum ...
+    StkId saved = L->ci->func;
+    L->ci->func = L->ci->previous->func - 1;
+    lua_pushvalue(L, 1);
+    L->ci->func = saved; // "You have seen nothing"
+    // Stack: caller function
+
+    // Let's get the '_ENV' variable. It is an upvalue of the LUA function.
+    int n = 0;
+    bool _env_found = false;
+    while (const char* s = lua_getupvalue (L, -1, ++n))
+    {
+        if (strcmp(s, "_ENV") == 0)
+        {
+            _env_found = true;
+            break;
+        }
+        lua_pop(L, 1);
+    }
+    if (!_env_found) // Should not happen .. ?
+        return true;
+    // Stack: _ENV of caller
+
+    // Do we have access to global variable ?
+    lua_pushstring(L, "_G");
+    lua_rawget(L, -2);
+    // Stack: _ENV of caller, _ENV[_G]
+    lua_remove(L, -2);
+    // Stack: _ENV[_G]
+    if (lua_isnoneornil(L, -1))
+    {
+        lua_pop(L, 1);
+        return true;
+    }
+    lua_pushglobaltable(L);
+    // Stack: _ENV[_G], _G
+    if (lua_rawequal(L, -1, -2))
+    {
+        lua_pop(L, 2);
+        return false;
+    }
+    lua_pop(L, 2);
+    return true;
 }
 
 LuaFileScriptLoader::LuaFileScriptLoader(const char* scriptname, const char* filename):
