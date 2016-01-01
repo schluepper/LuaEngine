@@ -529,7 +529,7 @@ void Eluna::RunScripts()
     else
     {
         if (safe_mode)
-            sLog.outError("LUA variable sandbox_env not found ! LUA scripts won't load.");
+            ELUNA_LOG_ERROR("LUA variable sandbox_env not found ! LUA scripts won't load.");
         lua_newtable(L);
         lua_setglobal(L, ELUNA_SAFE_MODE_ENV);
     }
@@ -537,7 +537,7 @@ void Eluna::RunScripts()
 
     count += RunScripts(lua_scripts, loaded);
 
-    ELUNA_LOG_DEBUG("[Eluna]: Executed %u Lua scripts (including %u extensions) in %u ms", count, lua_extensions.size(), ElunaUtil::GetTimeDiff(oldMSTime));
+    ELUNA_LOG_DEBUG("[Eluna]: Executed %u Lua scripts (including %zu extensions) in %u ms", count, lua_extensions.size(), ElunaUtil::GetTimeDiff(oldMSTime));
 
     OnLuaStateOpen();
 }
@@ -602,11 +602,12 @@ bool Eluna::RunScript(LuaScriptLoader& loader)
     // Allow binary and text modes ?
     const char* mode = safe_mode ? "t" : "bt"; // Possible flaws with binary code
     int loadResult = lua_load(L, Eluna_RunScript_Reader, (&loader), loader.GetScriptName(), "bt");
-    if (loadResult)
+    if (loadResult) // Syntax error
     {
         // Stack: errmsg
         ELUNA_LOG_ERROR("[Eluna]: Error %i loading `%s`", loadResult, loader.GetScriptName());
         Report(L);
+        Push(L, false); // Call failed
         return false;
     }
     // Stack: filefunc
