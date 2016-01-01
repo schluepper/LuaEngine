@@ -302,6 +302,8 @@ void Eluna::OpenLua()
     lua_pushstring(L, ""); // erase cpath
     lua_setfield(L, -2, "cpath");
     lua_pop(L, 1);
+
+    ASSERT(!lua_gettop(L)); // Stack should be empty
 }
 
 void Eluna::CreateBindStores()
@@ -520,7 +522,7 @@ void Eluna::RunScripts()
     count += RunScripts(lua_extensions, loaded);
 
     // Setup safe_mode here
-    safe_mode = eConfig->GetBoolValue("Eluna.SafeMode", true);
+    safe_mode = eConfigMgr->GetBoolDefault("Eluna.SafeMode", true);
     lua_getglobal(L, "sandbox_env");
     if (lua_istable(L, -1))
         lua_setglobal(L, ELUNA_SAFE_MODE_ENV);
@@ -530,10 +532,8 @@ void Eluna::RunScripts()
             sLog.outError("LUA variable sandbox_env not found ! LUA scripts won't load.");
         lua_newtable(L);
         lua_setglobal(L, ELUNA_SAFE_MODE_ENV);
-        lua_pop(L, 1);
     }
-    lua_pop(L, 1);
-
+    ASSERT(lua_gettop(L) == 0); // Stack should be empty
 
     count += RunScripts(lua_scripts, loaded);
 
@@ -545,6 +545,7 @@ void Eluna::RunScripts()
 uint32 Eluna::RunScripts(ScriptList const& scripts, std::unordered_map<std::string, std::string>& loaded)
 {
     uint32 count = 0;
+    int base = lua_gettop(L);
     lua_getglobal(L, "package");
     // Stack: package
     luaL_getsubtable(L, -1, "loaded");
@@ -572,12 +573,16 @@ uint32 Eluna::RunScripts(ScriptList const& scripts, std::unordered_map<std::stri
         LuaFileScriptLoader loader(it->filename.c_str(), it->filepath.c_str());
         if (RunScript(loader))
         {
-            // successfully loaded and ran file
-            lua_setfield(L, modules, it->filename.c_str());
+            // Stack: package, modules, result
+            lua_setfield(L, modules, it->filename.c_str()); // sets modules[$filename] = callresult
+            // Stack: package, modules
+            ASSERT(lua_gettop(L) == base + 2);
             ELUNA_LOG_DEBUG("[Eluna]: Successfully loaded `%s`", it->filepath.c_str());
             ++count;
             continue;
         }
+        lua_pop(L, 1);
+        ASSERT(lua_gettop(L) == base + 2);
     }
     // Stack: package, modules
     lua_pop(L, 2);
@@ -622,9 +627,9 @@ bool Eluna::RunScript(LuaScriptLoader& loader)
             lua_pop(L, 1);
             Push(L, true);
         }
-        // Stack: (empty)
+        // Stack: result
 
-        // successfully loaded and ran file
+        // successfully loaded and ran script
         return true;
     }
     return false;

@@ -250,7 +250,14 @@ private:
     void DestroyBindStores();
     void CreateBindStores();
     void InvalidateObjects();
-    bool ExecuteCall(int params, int res);
+    /*
+     * Calls function with nparams arguments, and retrieves nres results.
+     * If call fails (returns false), all results will be nil values.
+     *
+     * Before call stack: function, param[0], param[1], ... param[nparams-1]
+     * After call: result[0], result[1], ... result[nres-1]
+     */
+    bool ExecuteCall(int nparams, int nres);
 
     // Use ReloadEluna() to make eluna reload
     // This is called on _ReloadEluna to reload eluna
@@ -408,7 +415,21 @@ public:
     void PushInstanceData(lua_State* L, ElunaInstanceAI* ai, bool incrementCounter = true);
 
     void RunScripts();
+    /*
+     * Executes scripts in given ScriptList $scripts (map scriptname => scriptpath).
+     * All scripts which we attempt to load are inserted in $loaded (even failed ones)
+     *
+     * Stack is never changed
+     */
     uint32 RunScripts(ScriptList const& scripts, std::unordered_map<std::string, std::string>& loaded);
+    /*
+     * Executes script loaded with $loader.
+     * Returns true iif the script get executed without error.
+     *
+     * Before call stack: (empty)
+     * After call stack:    true                - if returns true
+     *                      lua_pcall result    - if returns false
+     */
     bool RunScript(LuaScriptLoader& loader);
     bool IsEnabled() const { return enabled; }
     int Register(lua_State* L, uint8 reg, uint32 entry, uint64 guid, uint32 instanceId, uint32 event_id, int functionRef, uint32 shots);
