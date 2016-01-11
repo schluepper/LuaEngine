@@ -2,7 +2,7 @@
 * Copyright (C) 2010 - 2015 Eluna Lua Engine <http://emudevs.com/>
 * This program is free software licensed under GPL version 3
 * Please see the included DOCS/LICENSE.md for more information
-*/
+*/ 
 
 #include "Hooks.h"
 #include "LuaEngine.h"
@@ -15,6 +15,7 @@
 #include "ElunaGameObjectAI.h"
 #include "ElunaCreatureAI.h"
 #include "ElunaInstanceAI.h"
+#include "Database/DatabaseEnv.h"
 
 #ifdef USING_BOOST
 #include <boost/filesystem.hpp>
@@ -86,6 +87,7 @@ void Eluna::Initialize()
     // Create global eluna
     GEluna = new Eluna(nullptr);
     GEluna->RunScripts();
+	GEluna->LoadAllSQLScripts();
 }
 
 void Eluna::Uninitialize()
@@ -375,6 +377,9 @@ void Eluna::DestroyBindStores()
     CreatureUniqueBindings = nullptr;
 }
 
+std::unordered_map<uint32, std::string> Eluna::LuaScriptsSQL;
+std::unordered_map<uint32, std::unordered_set<uint32>> Eluna::LuaScriptMapping;
+
 void Eluna::AddScriptPath(std::string filename, const std::string& fullpath)
 {
     ELUNA_LOG_DEBUG("[Eluna]: AddScriptPath Checking file `%s`", fullpath.c_str());
@@ -506,6 +511,157 @@ void Eluna::GetScripts(std::string path)
 static bool ScriptPathComparator(const LuaScript& first, const LuaScript& second)
 {
     return first.filepath < second.filepath;
+}
+
+
+void Eluna::LoadAllSQLScripts() 
+{
+	//Load all Scripts 
+	QueryResult *result = WorldDatabase.PQuery("SELECT ScriptId, scriptContent FROM LUA_scripts;");
+	int counter = 0;
+	if(result) {
+		do {
+			
+			Field* fields = result->Fetch();
+			
+			uint32 scriptid = fields[0].GetUInt32();
+			std::string content = fields[1].GetCppString();
+			Eluna::LuaScriptsSQL[scriptid] = content;
+			counter++;
+			
+		} while(result->NextRow());
+		
+		delete(result);
+		ELUNA_LOG_DEBUG("[Eluna]: Loaded `%u` Lua Scripts from SQL in memory.", counter);
+	}
+	
+	
+	counter = 0;
+	
+	//fill mappings
+	result = WorldDatabase.PQuery("SELECT MapId,ScriptId FROM LUA_scripts_maps ORDER BY MapId");
+	if(result) {
+		do {
+			
+			Field* fields = result->Fetch();
+			
+			uint32 mapid = fields[0].GetUInt32();
+			uint32 scriptid = fields[1].GetUInt32();
+			
+			auto search = Eluna::LuaScriptMapping.find(mapid);
+			if(search == Eluna::LuaScriptMapping.end()) {
+				std::unordered_set<uint32> tset;
+				Eluna::LuaScriptMapping[mapid] = tset;
+			}
+			
+			Eluna::LuaScriptMapping[mapid].insert(scriptid);
+			counter++;
+			
+		} while(result->NextRow());
+		
+		delete(result);
+		ELUNA_LOG_DEBUG("[Eluna]: Loaded `%u` Lua Mappings from SQL in memory.", counter);
+	}
+}
+
+void Eluna::RunSQLMapScripts(uint32 MapId)
+{
+	ELUNA_LOG_DEBUG("[Eluna]: Looking for Cached LUA Scripts in Map: %u", MapId);
+	auto search = Eluna::LuaScriptMapping.find(MapId);
+	if(search != Eluna::LuaScriptMapping.end()) {
+	
+		for (auto itr = Eluna::LuaScriptMapping[MapId].begin(); itr != Eluna::LuaScriptMapping[MapId].end(); ++itr) 
+		{
+			RunSQLScript(*itr);
+		}
+		
+	}
+}
+
+void Eluna::RunSQLScript(uint32 ScriptId) 
+{
+	if (!IsEnabled())
+        return;
+	
+	char numstr[21]; // enough to hold all numbers up to 64-bits
+	
+	std::string scriptPrefix = "SQLScript_";
+	std::string scriptName = scriptPrefix + ACE_OS::itoa(ScriptId, numstr, 10);
+	std::string scriptContent = "";
+	
+	auto search = Eluna::LuaScriptsSQL.find(ScriptId);
+	if(search != Eluna::LuaScriptsSQL.end()) {
+		scriptContent = Eluna::LuaScriptsSQL[ScriptId];
+	} else {
+		ELUNA_LOG_ERROR("[Eluna]: Error loading `%s`. LUA Script with ID `%u` could not be found in memory.", scriptName.c_str(), ScriptId);
+		return;
+	}
+	
+	// Setup safe_mode here
+    safe_mode = eConfigMgr->GetBoolDefault("Eluna.SafeMode", true);
+    lua_getglobal(L, "sandbox_env");
+    if (lua_istable(L, -1))
+        lua_setglobal(L, ELUNA_SAFE_MODE_ENV);
+    else
+    {
+        lua_pop(L, 1);
+        if (safe_mode)
+            ELUNA_LOG_ERROR("LUA variable sandbox_env not found ! LUA scripts won't load.");
+        lua_newtable(L);
+        lua_setglobal(L, ELUNA_SAFE_MODE_ENV);
+    }
+    ASSERT(lua_gettop(L) == 0); // Stack should be empty
+	
+	
+	int base = lua_gettop(L);
+	
+    uint32 oldMSTime = ElunaUtil::GetCurrTime();
+	std::unordered_map<std::string, std::string> loaded; // filename, path
+    lua_getglobal(L, "package");
+    // Stack: package
+    luaL_getsubtable(L, -1, "loaded");
+    // Stack: package, modules
+    int modules = lua_gettop(L);
+    
+    // Check that no duplicate names exist
+    if (loaded.find(scriptName) != loaded.end())
+    {
+        ELUNA_LOG_ERROR("[Eluna]: Error loading `%s`. File with same name already loaded from `%s`, rename either file", scriptName.c_str(), loaded[scriptName].c_str());
+		lua_pop(L, 2);
+        return;
+    }
+    loaded[scriptName] = scriptName;
+    
+    lua_getfield(L, modules, scriptName.c_str());
+    // Stack: package, modules, module
+    if (!lua_isnoneornil(L, -1))
+    {
+        lua_pop(L, 1);
+        ELUNA_LOG_DEBUG("[Eluna]: `%s` was already loaded or required", scriptName.c_str());
+		lua_pop(L, 2);
+        return;
+    }
+    lua_pop(L, 1);
+	
+	LuaStringScriptLoader loader(scriptName.c_str(), scriptContent);
+    if (RunScript(loader))
+    {
+        // Stack: package, modules, result
+        lua_setfield(L, modules, scriptName.c_str()); // sets modules[$filename] = callresult
+        // Stack: package, modules
+        ASSERT(lua_gettop(L) == base + 2);
+        ELUNA_LOG_DEBUG("[Eluna]: Successfully loaded `%s`", scriptName.c_str());
+    } 
+	else
+	{
+		lua_pop(L, 1);
+		ASSERT(lua_gettop(L) == base + 2);
+	}
+    
+    // Stack: package, modules
+    lua_pop(L, 2);
+    OnLuaStateOpen();
+	
 }
 
 void Eluna::RunScripts()
