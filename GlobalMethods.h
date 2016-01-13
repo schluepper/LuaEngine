@@ -623,7 +623,7 @@ namespace LuaGlobalFunctions
      *     PLAYER_EVENT_ON_LOOT_MONEY              =     37,       // (event, player, amount)
      *     PLAYER_EVENT_ON_QUEST_ABANDON           =     38,       // (event, player, questId)
      *     // UNUSED                               =     39,       // (event, player)
-     *     // UNUSED                               =     40,       // (event, player)
+     *     PLAYER_EVENT_ON_KILLED                  =     40,       // (event, player)
      *     // UNUSED                               =     41,       // (event, player)
      *     PLAYER_EVENT_ON_COMMAND                 =     42,       // (event, player, command) - player is nil if command used from console. Can return false
      *
