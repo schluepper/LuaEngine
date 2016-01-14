@@ -517,7 +517,7 @@ static bool ScriptPathComparator(const LuaScript& first, const LuaScript& second
 void Eluna::LoadAllSQLScripts() 
 {
     //Load all Scripts 
-    QueryResult *result = WorldDatabase.PQuery("SELECT ScriptId, ScriptContent FROM lua_scripts;");
+    QueryResult *result = WorldDatabase.PQuery("SELECT ScriptId, ScriptContent FROM lua_scripts");
     int counter = 0;
     if(result) 
     {
