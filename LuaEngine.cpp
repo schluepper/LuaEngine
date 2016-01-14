@@ -517,7 +517,7 @@ static bool ScriptPathComparator(const LuaScript& first, const LuaScript& second
 void Eluna::LoadAllSQLScripts() 
 {
     //Load all Scripts 
-    QueryResult *result = WorldDatabase.PQuery("SELECT ScriptId, scriptContent FROM LUA_scripts;");
+    QueryResult *result = WorldDatabase.PQuery("SELECT ScriptId, ScriptContent FROM lua_scripts;");
     int counter = 0;
     if(result) 
     {
@@ -538,7 +538,7 @@ void Eluna::LoadAllSQLScripts()
     counter = 0;
 	
     //fill mappings
-    result = WorldDatabase.PQuery("SELECT MapId,ScriptId FROM LUA_scripts_maps ORDER BY MapId");
+    result = WorldDatabase.PQuery("SELECT MapId,ScriptId FROM lua_scripts_maps ORDER BY MapId");
     if(result) 
     {
         do 
@@ -549,11 +549,6 @@ void Eluna::LoadAllSQLScripts()
             uint32 scriptId = fields[1].GetUInt32();
 			
             auto search = Eluna::luaScriptMapping.find(mapId);
-            if(search == Eluna::luaScriptMapping.end()) 
-            {
-                std::unordered_set<uint32> tset;
-                Eluna::luaScriptMapping[mapId] = tset;
-            }
 			
             Eluna::luaScriptMapping[mapId].insert(scriptId);
             counter++;
@@ -601,22 +596,6 @@ void Eluna::RunSQLScript(uint32 scriptId)
         ELUNA_LOG_ERROR("[Eluna]: Error loading `%s`. LUA Script with ID `%u` could not be found in memory.", scriptName.c_str(), scriptId);
         return;
     }
-	
-    // Setup safe_mode here
-    safe_mode = eConfigMgr->GetBoolDefault("Eluna.SafeMode", true);
-    lua_getglobal(L, "sandbox_env");
-    if (lua_istable(L, -1))
-        lua_setglobal(L, ELUNA_SAFE_MODE_ENV);
-    else
-    {
-        lua_pop(L, 1);
-        if (safe_mode)
-            ELUNA_LOG_ERROR("LUA variable sandbox_env not found ! LUA scripts won't load.");
-        lua_newtable(L);
-        lua_setglobal(L, ELUNA_SAFE_MODE_ENV);
-    }
-    ASSERT(lua_gettop(L) == 0); // Stack should be empty
-	
 	
     int base = lua_gettop(L);
 	
