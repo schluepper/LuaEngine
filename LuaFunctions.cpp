@@ -56,6 +56,7 @@ ElunaFunction::ElunaRegister GlobalMethods[] =
     { MTMAP_SAFE,                   "RegisterBGEvent", &LuaGlobalFunctions::RegisterBGEvent },
     { MTMAP_SAFE,                   "RegisterMapEvent", &LuaGlobalFunctions::RegisterMapEvent },
     { MTMAP_SAFE,                   "RegisterInstanceEvent", &LuaGlobalFunctions::RegisterInstanceEvent },
+    { MTMAP_SAFE,                   "RegisterTest", &LuaGlobalFunctions::RegisterTest },
 
     { MTMAP_SAFE | NOT_IN_SAFEMODE, "ClearBattleGroundEvents", &LuaGlobalFunctions::ClearBattleGroundEvents },
     { MTMAP_SAFE | NOT_IN_SAFEMODE, "ClearCreatureEvents", &LuaGlobalFunctions::ClearCreatureEvents },
@@ -80,7 +81,7 @@ ElunaFunction::ElunaRegister GlobalMethods[] =
     { MTMAP_SAFE,                   "GetCoreVersion", &LuaGlobalFunctions::GetCoreVersion },
     { MTMAP_SAFE,                   "GetCoreExpansion", &LuaGlobalFunctions::GetCoreExpansion },
     { MTMAP_SAFE,                   "GetQuest", &LuaGlobalFunctions::GetQuest },
-    { NOT_IN_SAFEMODE,              "GetPlayerByGUID", &LuaGlobalFunctions::GetPlayerByGUID },
+    { MTMAP_SAFE,                   "GetPlayerByGUID", &LuaGlobalFunctions::GetPlayerByGUID },
     { NOT_IN_SAFEMODE,              "GetPlayerByName", &LuaGlobalFunctions::GetPlayerByName },
     { MTMAP_SAFE,                   "GetGameTime", &LuaGlobalFunctions::GetGameTime },
     { NOT_IN_SAFEMODE,              "GetPlayersInWorld", &LuaGlobalFunctions::GetPlayersInWorld },
@@ -143,6 +144,7 @@ ElunaFunction::ElunaRegister GlobalMethods[] =
     { MTMAP_SAFE,                   "StateChannelSend", &LuaGlobalFunctions::StateChannelSend },
     { MTMAP_SAFE,                   "StateChannelRegister", &LuaGlobalFunctions::StateChannelRegister },
     { MTMAP_SAFE,                   "StateChannelUnregister", &LuaGlobalFunctions::StateChannelUnregister },
+    { MTMAP_SAFE,                   "SpawnPlayerBot", &LuaGlobalFunctions::SpawnPlayerBot },
 
     { FLAGS_NONE, nullptr, nullptr },
 };
@@ -736,6 +738,7 @@ ElunaRegister<Player> PlayerMethods[] =
     { MTMAP_SAFE | NOT_IN_SAFEMODE, "SaveToDB", &LuaPlayer::SaveToDB },                                                 // :SaveToDB() - Saves to database
     { NOT_IN_SAFEMODE,              "GroupInvite", &LuaPlayer::GroupInvite },
     { NOT_IN_SAFEMODE,              "GroupCreate", &LuaPlayer::GroupCreate },
+    { MTMAP_SAFE,                   "IsPlayerBot", &LuaPlayer::IsPlayerBot },
 #ifdef CLASSIC
     { MTMAP_SAFE,                   "UpdateHonor", &LuaPlayer::UpdateHonor },                                             // :UpdateHonor() - Updates Player Honor
     { MTMAP_SAFE,                   "ResetHonor", &LuaPlayer::ResetHonor },                                               // :ResetHonor() - Resets Player Honor

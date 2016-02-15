@@ -85,7 +85,8 @@ namespace Hooks
         REGTYPE_BG,
         REGTYPE_MAP,
         REGTYPE_INSTANCE,
-        REGTYPE_COUNT
+        REGTYPE_COUNT,
+        REGTYPE_TEST
     };
 
     enum ServerEvents
@@ -335,6 +336,12 @@ namespace Hooks
         INSTANCE_EVENT_ON_GAMEOBJECT_CREATE             = 6,    // (event, instance_data, map, go)
         INSTANCE_EVENT_ON_CHECK_ENCOUNTER_IN_PROGRESS   = 7,    // (event, instance_data, map)
         INSTANCE_EVENT_COUNT
+    };
+
+    enum TestEvents
+    {
+        TEST_EVENT_ON_STARTUP                           = 1,
+        TEST_EVENT_COUNT
     };
 };
 

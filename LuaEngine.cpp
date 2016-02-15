@@ -1262,6 +1262,11 @@ int Eluna::Register(lua_State* L, uint8 regtype, uint32 entry, uint64 guid, uint
                 return 1; // Stack: callback
             }
             break;
+        case Hooks::REGTYPE_TEST:
+            if (event_id < Hooks::TEST_EVENT_COUNT)
+            {
+
+            }
     }
     luaL_unref(L, LUA_REGISTRYINDEX, functionRef);
     std::ostringstream oss;

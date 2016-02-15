@@ -3944,6 +3944,13 @@ namespace LuaPlayer
         return 1;
     }
 
+    int IsPlayerBot(lua_State* L, Player* player)
+    {
+        Eluna::Push(L, player->GetSession()->IsActivePlayerBot());
+
+        return 1;
+    }
+
     /*int BindToInstance(lua_State* L, Player* player)
     {
     player->BindToInstance();

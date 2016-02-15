@@ -2923,5 +2923,35 @@ namespace LuaGlobalFunctions
         Eluna::Push(L, true);
         return 1;
     }
+
+    int RegisterTest(lua_State* L)
+    {
+        return RegisterEventHelper(L, Hooks::REGTYPE_TEST);
+    }
+
+    /**
+     * Spawns a new player bot by using the provided character
+     *
+     * @param string characterName : name of the character the bot shall log in as
+     * @return ObjectGuid loggedInPlayer
+     */
+    int SpawnPlayerBot(lua_State* L)
+    {
+        std::string characterName = Eluna::CHECKVAL<std::string>(L, 1);
+
+        try
+        {
+            uint32 accountId = ePlayerBotMgr->CreateBot(characterName);
+            PlayerBot* playerBot = ePlayerBotMgr->GetBot(accountId);
+
+            Eluna::Push(L, playerBot->GetPlayerObjectGuid());
+        }
+        catch (bool)
+        {
+            return luaL_error(L, "Bot could not be logged in.");
+        }
+
+        return 1;
+    }
 }
 #endif

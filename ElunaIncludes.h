@@ -37,6 +37,7 @@
 #include "TemporarySummon.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
+#include "PlayerBot\PlayerBotMgr.h"
 
 #ifdef TRINITY
 #include "Config.h"
@@ -108,6 +109,7 @@ typedef ThreatContainer::StorageType ThreatList;
 #define eObjectMgr              (&sObjectMgr)
 #define eAccountMgr             (&sAccountMgr)
 #define eAuctionMgr             (&sAuctionMgr)
+#define ePlayerBotMgr           (&sPlayerBotMgr)
 #define eObjectAccessor()       sObjectAccessor.
 #define SERVER_MSG_STRING       SERVER_MSG_CUSTOM
 #define TOTAL_LOCALES           MAX_LOCALE
